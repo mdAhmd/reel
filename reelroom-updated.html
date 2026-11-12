@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="description" content="A minimal, swipeable Instagram Reel collection.">
+<title>Reels</title>
+<style>
+:root{color-scheme:dark;--black:#000;--white:#fff;--muted:#aaa;--line:#ffffff20;--header:0px}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;height:100dvh;overflow:hidden;background:#000;color:#fff;font-family:Arial,Helvetica,sans-serif}
+button{font:inherit}
+#app{height:100%;height:100dvh;width:100%;overflow:hidden;position:relative;background:#000}
+.page{position:absolute;inset:0;background:#000;display:none}
+.page.active{display:block}
+#feedPage{overflow:hidden}
+#feed{height:100%;height:100dvh;width:100%;overflow-y:auto;overflow-x:hidden;scroll-snap-type:y mandatory;overscroll-behavior-y:contain;scrollbar-width:none}
+#feed::-webkit-scrollbar{display:none}
+.reel{height:100%;height:100dvh;width:100%;scroll-snap-align:start;scroll-snap-stop:always;position:relative;display:flex;align-items:center;justify-content:center;background:#000;overflow:hidden}
+.embed-area{width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#000}
+.embed-area blockquote.instagram-media{margin:0 auto!important;max-width:540px!important;min-width:0!important;width:100%!important;border:0!important;border-radius:0!important;background:#000!important}
+.embed-area iframe{max-width:100%!important}
+.reel-loading{position:absolute;inset:0;display:grid;place-items:center;background:#000;color:#aaa;font-size:13px;pointer-events:none;text-align:center;padding:24px}
+.loader{width:22px;height:22px;border:2px solid #ffffff30;border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.reel-overlay{position:absolute;right:max(12px,env(safe-area-inset-right));bottom:max(28px,env(safe-area-inset-bottom));z-index:3;display:flex;flex-direction:column;align-items:center;gap:15px;pointer-events:none}
+.menu-wrap{position:relative;pointer-events:auto}
+.menu-button,.reaction-button{width:42px;height:42px;border:1px solid #ffffff45;border-radius:50%;background:#111a;color:#fff;display:grid;place-items:center;cursor:pointer;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);font-size:20px}
+.reaction-button{font-size:18px}
+.menu-pop{position:absolute;right:0;bottom:52px;display:none;min-width:145px;padding:6px;border:1px solid #ffffff24;border-radius:13px;background:#17171bed;box-shadow:0 12px 35px #0009;backdrop-filter:blur(15px)}
+.menu-pop.open{display:block}
+.menu-pop button{display:block;width:100%;padding:11px 12px;text-align:left;border:0;border-radius:8px;background:transparent;color:#fff;font-size:13px;cursor:pointer}
+.menu-pop button:active{background:#ffffff18}
+.reel-caption{position:absolute;left:14px;bottom:max(27px,env(safe-area-inset-bottom));max-width:65%;z-index:2;color:#fff;font-size:12px;text-shadow:0 1px 8px #000;pointer-events:none}
+.credit{position:fixed;z-index:4;left:50%;bottom:max(7px,env(safe-area-inset-bottom));transform:translateX(-50%);font-size:9px;letter-spacing:.2px;color:#ffffff75;white-space:nowrap;pointer-events:none}
+#gridPage{overflow-y:auto;overscroll-behavior:contain;padding:env(safe-area-inset-top) 10px env(safe-area-inset-bottom);scrollbar-width:none}
+#gridPage::-webkit-scrollbar{display:none}
+.grid-top{height:48px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:4;background:#000;padding:0 4px}
+.back-button{border:0;background:transparent;color:#fff;font-size:14px;padding:10px 8px;cursor:pointer}
+.grid-title{font-size:13px;color:#ddd}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px}
+.grid-item{aspect-ratio:9/14;position:relative;overflow:hidden;border:0;padding:0;background:#171717;cursor:pointer}
+.grid-item img{width:100%;height:100%;object-fit:cover;display:block}
+.grid-placeholder{width:100%;height:100%;display:grid;place-items:center;color:#aaa;font-size:11px;padding:8px;text-align:center;background:linear-gradient(145deg,#24202a,#101012)}
+.grid-item span{position:absolute;left:6px;bottom:6px;color:#fff;font-size:10px;text-shadow:0 1px 5px #000}
+.grid-empty{padding:40px 16px;text-align:center;color:#aaa;font-size:13px;line-height:1.6}
+#toast{position:fixed;z-index:20;left:50%;bottom:24px;transform:translate(-50%,12px);opacity:0;pointer-events:none;background:#252525;color:#fff;border:1px solid #ffffff25;border-radius:30px;padding:10px 14px;font-size:12px;transition:.2s;max-width:90%;text-align:center}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+.error-state{width:min(90%,420px);margin:auto;text-align:center;color:#aaa;font-size:13px;line-height:1.6;padding:30px}
+.error-state strong{display:block;color:#fff;font-size:17px;margin-bottom:8px}
+@media(min-width:700px){
+  .embed-area blockquote.instagram-media{max-width:min(100%,540px)!important}
+  .reel-overlay{right:max(24px,calc((100vw - 620px)/2));bottom:38px}
+  .reel-caption{left:max(24px,calc((100vw - 620px)/2));bottom:38px}
+  .grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;max-width:1200px;margin:auto}
+  .grid-top{max-width:1200px;margin:auto}
+}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<div id="app">
+  <section id="feedPage" class="page active" aria-label="Reels">
+    <main id="feed"><div class="error-state"><div class="loader"></div>Loading Reels…</div></main>
+    <div class="credit">Developed By Mohd Ahmed</div>
+  </section>
+  <section id="gridPage" class="page" aria-label="All Reels">
+    <div class="grid-top">
+      <button class="back-button" id="backButton" type="button">‹ Back to Reel</button>
+      <div class="grid-title">All Reels</div>
+      <span style="width:88px"></span>
+    </div>
+    <div id="grid" class="grid"></div>
+    <div class="credit">Developed By Mohd Ahmed</div>
+  </section>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/*
+  GOOGLE SHEETS CONNECTION
+  Paste the deployed Apps Script Web App URL below.
+*/
+const SHEET_API_URL = "PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";
+const WHATSAPP_NUMBER = "917869231186"; // India country code 91 + your number
+
+const feed=document.getElementById("feed");
+const feedPage=document.getElementById("feedPage");
+const gridPage=document.getElementById("gridPage");
+const grid=document.getElementById("grid");
+const toast=document.getElementById("toast");
+let reels=[],slides=[],currentIndex=0,observer=null,scriptPromise=null,toastTimer=null;
+
+function normalizeInstagramUrl(raw){
+  try{
+    const u=new URL(String(raw||"").trim());
+    const host=u.hostname.toLowerCase().replace(/^www\./,"");
+    if(!["instagram.com","instagr.am"].includes(host))return null;
+    const m=u.pathname.match(/^\/(reel|reels|p|tv)\/([A-Za-z0-9_-]+)\/?/);
+    if(!m)return null;
+    const type=m[1].toLowerCase()==="reels"?"reel":m[1].toLowerCase();
+    return `https://www.instagram.com/${type}/${m[2]}/`;
+  }catch{return null}
+}
+function notify(message){
+  toast.textContent=message;toast.classList.add("show");
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>toast.classList.remove("show"),2400);
+}
+function jsonp(url){
+  return new Promise((resolve,reject)=>{
+    const cb="rr_"+Date.now()+"_"+Math.floor(Math.random()*1e6);
+    const script=document.createElement("script");
+    const timer=setTimeout(()=>{cleanup();reject(new Error("Google Sheets did not respond. Check the Apps Script deployment URL."));},15000);
+    function cleanup(){clearTimeout(timer);delete window[cb];script.remove();}
+    window[cb]=data=>{cleanup();resolve(data);};
+    script.onerror=()=>{cleanup();reject(new Error("Could not connect to Google Sheets. Check that the Web App is deployed for public access."));};
+    script.src=url+(url.includes("?")?"&":"?")+"callback="+cb+"&_="+Date.now();
+    document.body.appendChild(script);
+  });
+}
+function loadInstagramScript(){
+  if(window.instgrm?.Embeds)return Promise.resolve();
+  if(scriptPromise)return scriptPromise;
+  scriptPromise=new Promise((resolve,reject)=>{
+    const s=document.createElement("script");s.async=true;s.src="https://www.instagram.com/embed.js";
+    s.onload=resolve;s.onerror=()=>reject(new Error("Instagram embed script failed to load."));
+    document.body.appendChild(s);
+  });
+  return scriptPromise;
+}
+function showFeedError(message){
+  feed.innerHTML="";const box=document.createElement("div");box.className="error-state";
+  const strong=document.createElement("strong");strong.textContent="Reels couldn't load";
+  const p=document.createElement("div");p.textContent=message;box.append(strong,p);feed.append(box);
+}
+function makeReel(reel,index){
+  const section=document.createElement("section");section.className="reel";section.dataset.index=String(index);
+  const area=document.createElement("div");area.className="embed-area";
+  const loading=document.createElement("div");loading.className="reel-loading";
+  const inner=document.createElement("div");inner.innerHTML='<div class="loader"></div>Loading Reel…';loading.append(inner);area.append(loading);
+  const caption=document.createElement("div");caption.className="reel-caption";caption.textContent=reel.title||"";
+  const overlay=document.createElement("div");overlay.className="reel-overlay";
+  const wrap=document.createElement("div");wrap.className="menu-wrap";
+  const menuButton=document.createElement("button");menuButton.className="menu-button";menuButton.type="button";menuButton.textContent="⋯";menuButton.setAttribute("aria-label","More options");
+  const menu=document.createElement("div");menu.className="menu-pop";
+  const viewAll=document.createElement("button");viewAll.type="button";viewAll.textContent="▦  View all Reels";
+  viewAll.addEventListener("click",()=>openGrid());
+  const react=document.createElement("button");react.type="button";react.textContent="♡  React to this Reel";
+  react.addEventListener("click",()=>sendReaction(index));
+  menu.append(viewAll,react);
+  menuButton.addEventListener("click",e=>{e.stopPropagation();document.querySelectorAll(".menu-pop.open").forEach(m=>{if(m!==menu)m.classList.remove("open")});menu.classList.toggle("open")});
+  wrap.append(menuButton,menu);
+  const reaction=document.createElement("button");reaction.className="reaction-button";reaction.type="button";reaction.textContent="♡";reaction.setAttribute("aria-label","Send reaction");reaction.addEventListener("click",()=>sendReaction(index));
+  overlay.append(wrap,reaction);
+  section.append(area,caption,overlay);section._area=area;section._url=reel.url;section._loaded=false;
+  feed.append(section);slides.push(section);
+}
+async function mountReel(slide){
+  if(slide._loaded)return;slide._loaded=true;
+  const block=document.createElement("blockquote");block.className="instagram-media";
+  block.dataset.instgrmPermalink=slide._url;block.dataset.instgrmVersion="14";
+  block.style.cssText="background:#000;border:0;margin:0 auto;max-width:540px;min-width:0;padding:0;width:100%";
+  const fallback=document.createElement("a");fallback.href=slide._url;fallback.target="_blank";fallback.rel="noopener noreferrer";fallback.textContent="View on Instagram";block.append(fallback);
+  slide._area.replaceChildren(block);
+  try{
+    await loadInstagramScript();
+    window.instgrm.Embeds.process();
+    setTimeout(()=>{
+      if(slide.isConnected&&!slide._area.querySelector("iframe")){
+        slide._loaded=false;
+        const note=document.createElement("div");note.className="reel-loading";note.textContent="This Reel couldn't be embedded. Use the menu to open it on Instagram.";
+        slide._area.replaceChildren(note);
+      }
+    },16000);
+  }catch{
+    slide._loaded=false;const note=document.createElement("div");note.className="reel-loading";note.textContent="Instagram's player could not load. Check your connection.";slide._area.replaceChildren(note);
+  }
+}
+function sendReaction(index){
+  const reel=reels[index];if(!reel)return;
+  const message=`I reacted to this Reel${reel.title?": "+reel.title:""}\n${reel.url}`;
+  const phone=WHATSAPP_NUMBER.replace(/\D/g,"");
+  const url=`https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+  window.open(url,"_blank","noopener,noreferrer");
+  document.querySelectorAll(".menu-pop.open").forEach(m=>m.classList.remove("open"));
+}
+function openGrid(){
+  feedPage.classList.remove("active");gridPage.classList.add("active");
+  document.querySelectorAll(".menu-pop.open").forEach(m=>m.classList.remove("open"));
+  buildGrid();
+}
+function closeGrid(index){
+  gridPage.classList.remove("active");feedPage.classList.add("active");
+  if(Number.isInteger(index)&&slides[index]){currentIndex=index;slides[index].scrollIntoView({behavior:"instant",block:"start"});mountReel(slides[index]);}
+}
+function buildGrid(){
+  grid.innerHTML="";
+  if(!reels.length){grid.innerHTML='<div class="grid-empty">No Reels available.</div>';return;}
+  reels.forEach((reel,index)=>{
+    const button=document.createElement("button");button.className="grid-item";button.type="button";button.setAttribute("aria-label",`Open Reel ${index+1}`);
+    const placeholder=document.createElement("div");placeholder.className="grid-placeholder";placeholder.textContent=reel.title||`Reel ${index+1}`;
+    button.append(placeholder);
+    const label=document.createElement("span");label.textContent=`${index+1}`;button.append(label);
+    button.addEventListener("click",()=>closeGrid(index));grid.append(button);
+  });
+}
+function render(data){
+  reels=(Array.isArray(data)?data:[]).map(x=>({url:normalizeInstagramUrl(x.url),title:String(x.title||"").slice(0,100)})).filter(x=>x.url);
+  feed.innerHTML="";slides=[];
+  if(!reels.length){showFeedError("Your Google Sheet has no active, valid Instagram links yet.");return;}
+  reels.forEach(makeReel);
+  if(observer)observer.disconnect();
+  observer=new IntersectionObserver(entries=>{
+    entries.forEach(entry=>{
+      if(entry.isIntersecting&&entry.intersectionRatio>=.55){
+        currentIndex=Number(entry.target.dataset.index);
+        mountReel(entry.target);
+        if(slides[currentIndex+1])mountReel(slides[currentIndex+1]);
+      }
+    });
+  },{root:feed,threshold:[.55,.75]});
+  slides.forEach(s=>observer.observe(s));
+  const requested=Number(new URLSearchParams(location.search).get("reel"));
+  if(requested>0&&requested<=slides.length)setTimeout(()=>{currentIndex=requested-1;slides[currentIndex].scrollIntoView({behavior:"instant"});mountReel(slides[currentIndex]);},100);
+}
+async function refreshReels(){
+  if(!SHEET_API_URL.startsWith("https://script.google.com/")){showFeedError("Setup required: paste your deployed Google Apps Script Web App URL into SHEET_API_URL in this HTML file.");return;}
+  try{
+    const result=await jsonp(SHEET_API_URL);
+    if(!result||result.ok!==true||!Array.isArray(result.reels))throw new Error(result?.error||"Unexpected response from Google Sheets.");
+    render(result.reels);
+  }catch(e){showFeedError(e.message);}
+}
+document.getElementById("backButton").addEventListener("click",()=>closeGrid(currentIndex));
+document.addEventListener("click",e=>{if(!e.target.closest(".menu-wrap"))document.querySelectorAll(".menu-pop.open").forEach(m=>m.classList.remove("open"));});
+document.addEventListener("keydown",e=>{
+  if(!feedPage.classList.contains("active"))return;
+  if(e.key==="ArrowDown"||e.key==="PageDown"){e.preventDefault();slides[Math.min(currentIndex+1,slides.length-1)]?.scrollIntoView({behavior:"smooth"});}
+  if(e.key==="ArrowUp"||e.key==="PageUp"){e.preventDefault();slides[Math.max(currentIndex-1,0)]?.scrollIntoView({behavior:"smooth"});}
+});
+refreshReels();
+</script>
+</body>
+</html>
