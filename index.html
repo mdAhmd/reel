@@ -95,8 +95,8 @@ let reels=[],slides=[],currentIndex=0,observer=null,scriptPromise=null,toastTime
 function normalizeInstagramUrl(raw){
   try{
     const u=new URL(String(raw||"").trim());
-    const host=u.hostname.toLowerCase().replace(/^www\./,"\");
-    if(!["instagram.com","instagr.am"].includes(host))return null;
+    const host=u.hostname.toLowerCase().replace(/^www\./,"");
+    if (!["instagram.com","instagr.am"].includes(host))return null;
     const m=u.pathname.match(/^\/(reel|reels|p|tv)\/([A-Za-z0-9_-]+)\/?/);
     if(!m)return null;
     const type=m[1].toLowerCase()==="reels"?"reel":m[1].toLowerCase();
@@ -118,6 +118,23 @@ function jsonp(url){
     script.src=url+(url.includes("?")?"&":"?")+"callback="+cb+"&_="+Date.now();
     document.body.appendChild(script);
   });
+}
+async function loadSheetData(url){
+  try{
+    const requestUrl = url + (url.includes("?") ? "&" : "?") + "_=" + Date.now();
+    const response = await fetch(requestUrl, { cache: "no-store", credentials: "omit" });
+    if(!response.ok) throw new Error(`HTTP ${response.status}`);
+    const text = await response.text();
+    try{
+      return JSON.parse(text);
+    }catch{
+      const match = text.match(/^\s*(?:window\.[A-Za-z_$][\w$]*\s*=\s*)?([A-Za-z_$][\w$]*)\s*\((.*)\)\s*;?\s*$/s);
+      if(!match) throw new Error("Unexpected response from Google Sheets.");
+      return Function(`"use strict"; return (${match[2]});`)();
+    }
+  }catch(error){
+    return jsonp(url);
+  }
 }
 function loadInstagramScript(){
   if(window.instgrm?.Embeds)return Promise.resolve();
@@ -227,7 +244,7 @@ function render(data){
 async function refreshReels(){
   if(!SHEET_API_URL.startsWith("https://script.google.com/")){showFeedError("Setup required: paste your deployed Google Apps Script Web App URL into SHEET_API_URL in this HTML file.");return;}
   try{
-    const result=await jsonp(SHEET_API_URL);
+    const result=await loadSheetData(SHEET_API_URL);
     if(!result||result.ok!==true||!Array.isArray(result.reels))throw new Error(result?.error||"Unexpected response from Google Sheets.");
     render(result.reels);
   }catch(e){showFeedError(e.message);}
